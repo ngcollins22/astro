@@ -1,6 +1,9 @@
 import datetime
 from scipy import constants
 import numpy as np
+import plotly.graph_objects as go
+import plotly.io as pio
+import webbrowser
 
 OMEGA_ECEF = 15 #degrees per hour relative to sun
 OMEGA_RAAN = 1.0027379093*OMEGA_ECEF #true degrees per hour
@@ -127,3 +130,34 @@ def orbital_elements(rvec, vvec, mu):
         a = -mu/(2*eps)
         nu = true_anomaly(evec, rvec, vvec)
         return [a, e, i, raan, omega, nu]
+    
+
+
+def visualize(p, e):
+
+    webbrowser.register('chrome', None, webbrowser.GenericBrowser('chrome'))
+    pio.renderers.default = 'browser'
+
+    nu = np.linspace(0, 2*np.pi, 360)
+    r = radius_of_orbit(p, e, nu)
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatterpolar(
+        r=r,  # radius values
+        theta=nu,  # angle values in degrees
+        mode='lines',  # Display as lines
+        name='Polar Plot'
+    ))
+
+    # Customize layout
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(visible=True),
+            angularaxis=dict(visible=True)
+        ),
+        showlegend=True
+    )
+
+    # Show the plot
+    fig.show()
