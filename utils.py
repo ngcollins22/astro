@@ -1,5 +1,5 @@
 import datetime
-from scipy import constants
+import scipy.constants as constants
 import numpy as np
 import plotly.graph_objects as go
 import plotly.io as pio
@@ -11,7 +11,9 @@ SIDEREAL_OVER_SOLAR = 1.0027379093 #sidereal time/solar time
 MU_EARTH = 3.986*(10**5) #gravitational paramter of earth km^3/s^2
 R_EARTH = 6378 #km
 M_EARTH = 5.972*(10**24) #kg
-G = 6.67430*10**(-11) # SI units
+G = 6.67430*(10**-20) # SI units
+M_LUNA = 7.34767309*(10**22) #kg
+J2 = 1084.64*(10**-6) # dimensionless
 
 I = [1,0,0]
 J = [0,1,0]
