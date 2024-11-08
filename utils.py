@@ -13,7 +13,7 @@ R_EARTH = 6378 #km
 M_EARTH = 5.972*(10**24) #kg
 G = 6.67430*(10**-20) # SI units
 M_LUNA = 7.34767309*(10**22) #kg
-J2 = 1084.64*(10**-6) # dimensionless
+J2 = 1.083*(10**-3) # dimensionless
 
 I = [1,0,0]
 J = [0,1,0]
@@ -50,8 +50,11 @@ def mag(vec):
     return np.linalg.norm(vec)
 
 #Calculate specific energy from r and v
-def specific_energy(r, v):
-    return (mag(v)**2)/2 - MU_EARTH/mag(r)
+def specific_energy(r, v, mu):
+    return (mag(v)**2)/2 - mu/mag(r)
+
+def specific_energy(mu, a):
+    return -mu/(2*a)
 
 
 #Calculate Time period from a and mu
@@ -134,34 +137,82 @@ def orbital_elements(rvec, vvec, mu):
         a = -mu/(2*eps)
         nu = true_anomaly(evec, rvec, vvec)
         return [a, e, i, raan, omega, nu]
-    
 
 
-def visualize(p, e):
+def timeperiod(deltaN):
+    return (1/SIDEREAL_OVER_SOLAR)*(1-deltaN/360)
 
-    webbrowser.register('chrome', None, webbrowser.GenericBrowser('chrome'))
-    pio.renderers.default = 'browser'
+def timeVisible(R, H, mu, beta):
+    return 2 * np.pi * np.sqrt((R+H)**3 /mu)*(2*beta)/360
 
-    nu = np.linspace(0, 2*np.pi, 360)
-    r = radius_of_orbit(p, e, nu)
+def planeChange(v, deltaTheta):
+    return 2 * v * np.sin(deltaTheta/2)
 
-    fig = go.Figure()
+def raiseApogee(r1, r2, mu):
+    return np.sqrt(2*mu*(1/r1 - 1/(r1+r2))) - np.sqrt(mu/r1)
 
-    fig.add_trace(go.Scatterpolar(
-        r=r,  # radius values
-        theta=nu,  # angle values in degrees
-        mode='lines',  # Display as lines
-        name='Polar Plot'
-    ))
+def velocityFromEnergy(eps, mu, r):
+    return np.sqrt(2*(eps + mu/r))
 
-    # Customize layout
-    fig.update_layout(
-        polar=dict(
-            radialaxis=dict(visible=True),
-            angularaxis=dict(visible=True)
-        ),
-        showlegend=True
-    )
+def flightPathAngle(h, r, v):
+    return np.arccos(h/(r*v))
 
-    # Show the plot
-    fig.show()
+def true_anomaly_pe(pt, et, p2, e2):
+    return np.arccos((pt-p2)/(et*p2 - e2*pt))
+
+def mean_anomaly(E, e):
+    return E - e*np.sin(E)
+
+def deltaA(a, e, M):
+    return 0.5*np.sqrt(1 - e**2)*(a**2)*M
+
+def TOF(M, mu, a):
+    return M/np.sqrt(mu/(a**3))
+
+def singleNRKeppler(Ei, e, M):
+    Mi = mean_anomaly(Ei, e)
+    Ei1 = Ei - (Mi-M)/(1 - e*np.cos(Ei))
+    return Ei1
+
+def solveNRKeppler(M, e, tol):
+    Ei = M
+    Mi = mean_anomaly(Ei, e)
+    i = 0
+    while(np.abs(Mi - M) > tol):
+        Ei = singleNRKeppler(Ei, e, M)
+        Mi = mean_anomaly(Ei, e)
+        i = i + 1
+    return [Ei, i]
+
+def mean_motion(a, mu):
+    return np.sqrt(mu/(a**3))
+
+def true_anomaly_Ee(E, e):
+    cosNu = (np.cos(E) - e)/(1 - e*np.cos(E))
+    return np.arccos(cosNu)
+
+
+def eccentric_anomaly(e, nu):
+    return np.arccos((e + np.cos(nu))/(1 + e*np.cos(nu)))
+
+def lagrange_coeffs_2D(r0, v0, r, v):
+    h = mag(np.cross(r0, v0))
+    f = (r[0]*v0[1] - r[1]*v0[0])/h
+    g = (r[1]*r0[0] - r[0]*r0[1])/h
+    fdot = (v[0]*v0[1] - v[1]*v0[0])/h
+    gdot = (r0[0]*v[1] - r0[1]*v[1])/h
+    return [f, g, fdot, gdot]
+
+def gibbs_method(r1, r2, r3):
+    Dvec = np.cross(r2,r3) + np.cross(r3, r1) + np.cross(r1,r2)
+    Nvec = mag(r1)*np.cross(r2,r3) + mag(r2)*np.cross(r3,r1)+mag(r3)*np.cross(r1,r2)
+    Svec = (mag(r2)-mag(r3))*np.array(r1) + (mag(r3)-mag(r1))*np.array(r2) + (mag(r1)-mag(r2))*np.array(r3)
+    D = mag(Dvec)
+    N = mag(Nvec)
+    S = mag(Svec)
+    p = N/D
+    e = S/D
+    Qhat = Svec/S
+    What = Nvec/N
+    Phat = np.cross(Qhat,What)
+    return [p, e, Phat, Qhat, What]
