@@ -13,7 +13,7 @@ R_EARTH = 6378 #km
 M_EARTH = 5.972*(10**24) #kg
 G = 6.67430*(10**-20) # SI units
 M_LUNA = 7.34767309*(10**22) #kg
-J2 = 1.083*(10**-3) # dimensionless
+J2 = 1.082*(10**-3) # dimensionless
 
 I = [1,0,0]
 J = [0,1,0]
@@ -216,3 +216,105 @@ def gibbs_method(r1, r2, r3):
     What = Nvec/N
     Phat = np.cross(Qhat,What)
     return [p, e, Phat, Qhat, What]
+
+def launch_azimuth(Ls, i):
+    if Ls >= 0:
+        return np.arcsin(np.cos(i)/np.cos(Ls))
+    else:
+        return np.pi - np.arcsin(np.cos(i)/np.cos(Ls))
+
+def launch_location_angle(beta, i, Ls):
+    if Ls >= 0:
+        return np.arccos(np.cos(beta)/np.sin(i))
+    else:
+        return -np.arccos(np.cos(beta)/np.sin(i))
+    
+def apparent_velocity(vin, veast, beta):
+    product = vin**2 + veast**2 - 2*vin*veast*np.cos(np.pi/2 - beta)
+    return np.sqrt(product)
+
+def apparent_launch_azimuth(beta, vin, vapp):
+    return np.arcsin((vin/vapp)*np.sin(np.pi/2 - beta)) - np.pi/2
+
+def hohmann_rendevous(achaser, atarget, mu, phi_init):
+    print("Hohmann Rendevous from a =", achaser, "to a =", atarget, "** WATCH UNITS **")
+    at = (achaser + atarget)/2
+    print(" at =", at)
+    TOF = np.pi*np.sqrt(at**3 / mu)
+    print(" TOF b/w burns =", f'{TOF:.4f}')
+    mean_motion_target = np.sqrt(mu/(atarget**3))
+    alpha_lead = mean_motion_target*TOF
+    print(" alpha lead (rad) =", f'{alpha_lead:.4f}')
+    phi_imp = np.pi - alpha_lead
+    print(" phase at impulse (rad) =", f'{phi_imp:.4f}')
+    mean_motion_chaser =  np.sqrt(mu/(achaser**3))
+    k = 0
+    deltaT_wait = (phi_imp - phi_init + 2*k*np.pi)/(mean_motion_target - mean_motion_chaser)
+    print(" wait time = ", f'{deltaT_wait:.4f}')
+    return [TOF, alpha_lead, phi_imp, deltaT_wait]
+
+def p_iteration_method(r1v, r2v, TOF, eps, mu, way):
+    # Initial constants
+    r1 = mag(r1v)
+    r2 = mag(r2v)
+    Nu = np.arccos(np.dot(r1v, r2v)/(r1*r2))
+    
+    if way == 1 :
+        Nu = 2*np.pi - Nu
+    cNu = np.cos(Nu)
+    k = r1*r2*(1-cNu)
+    m = r1*r2*(1+cNu)
+    l = r1 + r2
+
+    # Initial p-guess
+    pi = k/(l + np.sqrt(2*m))
+    pii = k/(l - np.sqrt(2*m))
+    p0 = (pi + pii)/2
+    pn = p0
+    pn1 = p0
+    TOFn = 0
+    while(np.abs(TOFn - TOF) >= eps):
+        pn = pn1
+        deltaEn = 2 * np.arccos((pn*l - k)/(2*pn*np.sqrt(r1*r2)*np.cos(Nu/2)))
+        an = (m*k*pn)/((pn**2)*(2*m - l**2) + 2*k*l*pn - k**2)
+        gn = (r1*r2*np.sin(Nu))/np.sqrt(mu*pn)
+        TOFn = gn + np.sqrt((an**3)/mu)*(deltaEn - np.sin(deltaEn))
+        #print(TOFn)
+        #print(pn)
+
+        dTOFdp = -gn/(2*pn) - (3/2)*an*(TOFn - gn)*((k**2 + (2*m - l**2)*(pn**2))/(m*k*(pn**2))) + np.sqrt((an**3)/mu)*(2*k*np.sin(deltaEn))/(pn*(k - l*pn))
+        pn1 = pn + (TOF - TOFn)/dTOFdp
+    # done!!!!
+    #print(TOFn)
+
+    f = 1 - (r2/pn)*(1-cNu)
+    g = (r1*r2*np.sin(Nu))/np.sqrt(mu*pn)
+    fdot = np.sqrt(mu/pn)*np.tan(Nu/2)*((1-cNu)/pn - 1/r2 - 1/r1)
+    gdot = 1 - (r1/pn)*(1-cNu)
+    v1v = (np.array(r2v) - f*np.array(r1v))/g
+    v2v = fdot*np.array(r1v) + np.array(v1v)*gdot
+
+    return [pn, v1v, v2v]
+
+
+def RAAN_dot(p, mean_motion, i):
+    return (-3/2)*J2*((R_EARTH/p)**2)*mean_motion*np.cos(i)
+
+
+def walker(t,p,f, star):
+    if(star == 1):
+        deltaRAAN = (np.pi)/p
+    else:
+        deltaRAAN = (2*np.pi)/p
+    
+    satsperplane = t/p
+    deltaNuInOrbit = (2*np.pi)/satsperplane
+    if(star == 1):
+        deltaNuPhase = (np.pi)/t * f
+    else:
+        deltaNuPhase = (2*np.pi)/t * f
+
+    return [deltaRAAN, deltaNuInOrbit, deltaNuPhase]
+
+def rsoi(am, m, M):
+    return am*((m/M)**(2/5))
