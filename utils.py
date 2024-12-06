@@ -318,3 +318,16 @@ def walker(t,p,f, star):
 
 def rsoi(am, m, M):
     return am*((m/M)**(2/5))
+
+def chi(m1, m2, m3):
+    p = [m1+m2,3*m1+2*m2,3*m1+m2,-(m2+3*m3),-(2*m2+3*m3),-(m2+m3)]
+    roots = np.roots(p)
+    for root in roots:
+        if ~np.iscomplex(root):
+            return np.real(root)
+        
+def find_third_mass(m1, m2, chi):
+    den = (3*chi**2 + 3*chi + 1)
+    num = (m1+m2)*(chi**5) + (3*m1 + 2*m2)*(chi**4) + (3*m1 + m2)*(chi**3) - m2*(chi**2) - 2*m2*chi - m2
+    return num/den
+    
